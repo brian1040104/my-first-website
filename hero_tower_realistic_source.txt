@@ -1,0 +1,1661 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>勇者之塔－回合制冒險</title>
+  <style>
+    :root {
+      --bg: #111827;
+      --panel: #1f2937;
+      --panel-2: #273449;
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --gold: #fbbf24;
+      --green: #22c55e;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --purple: #a855f7;
+      --border: rgba(255,255,255,.12);
+      --shadow: 0 14px 35px rgba(0,0,0,.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 10%, rgba(59,130,246,.25), transparent 32%),
+        radial-gradient(circle at 85% 15%, rgba(168,85,247,.20), transparent 30%),
+        linear-gradient(160deg, #0f172a, #111827 52%, #0b1020);
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .page {
+      width: min(1100px, 94vw);
+      margin: 0 auto;
+      padding: 24px 0 40px;
+    }
+
+    .title {
+      text-align: center;
+      margin: 0 0 18px;
+      font-size: clamp(28px, 5vw, 48px);
+      letter-spacing: 2px;
+      text-shadow: 0 4px 18px rgba(0,0,0,.5);
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--muted);
+      margin: -6px 0 22px;
+    }
+
+    .panel {
+      background: rgba(31,41,55,.92);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .hidden { display: none !important; }
+
+    /* 開始畫面 */
+    #startScreen {
+      padding: 28px;
+    }
+
+    .class-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin: 22px 0;
+    }
+
+    .class-card {
+      border: 2px solid transparent;
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 16px;
+      padding: 18px;
+      cursor: pointer;
+      text-align: left;
+      transition: .18s ease;
+    }
+
+    .class-card:hover,
+    .class-card.selected {
+      transform: translateY(-4px);
+      border-color: var(--gold);
+      box-shadow: 0 10px 22px rgba(0,0,0,.28);
+    }
+
+    .class-icon { font-size: 54px; display: block; text-align: center; }
+    .class-name { font-size: 24px; font-weight: 800; margin: 8px 0; text-align: center; }
+    .class-desc { color: var(--muted); line-height: 1.65; }
+
+    .start-actions {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    /* 遊戲畫面 */
+    .topbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 14px;
+      padding: 14px 16px;
+    }
+
+    .top-stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .top-stats strong { color: var(--text); }
+
+    .battle-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .fighter {
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      min-height: 340px;
+    }
+
+    .fighter::after {
+      content: "";
+      position: absolute;
+      inset: auto -60px -90px;
+      height: 180px;
+      background: radial-gradient(ellipse, rgba(255,255,255,.12), transparent 65%);
+      pointer-events: none;
+    }
+
+    .fighter.enemy-side {
+      background: linear-gradient(160deg, rgba(86,18,34,.94), rgba(31,41,55,.95));
+    }
+
+    .name-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .fighter-name {
+      font-size: 24px;
+      font-weight: 900;
+    }
+
+    .level-tag {
+      background: rgba(255,255,255,.12);
+      border: 1px solid var(--border);
+      padding: 5px 9px;
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .sprite {
+      height: 155px;
+      display: grid;
+      place-items: center;
+      font-size: 112px;
+      filter: drop-shadow(0 12px 16px rgba(0,0,0,.45));
+      transition: transform .18s ease, filter .18s ease;
+      user-select: none;
+    }
+
+    .sprite.hit {
+      transform: translateX(-10px) rotate(-4deg) scale(.94);
+      filter: drop-shadow(0 0 18px rgba(239,68,68,.85));
+    }
+
+    .sprite.attack {
+      transform: translateX(12px) scale(1.06);
+    }
+
+    .bar-wrap { margin: 10px 0; }
+    .bar-label { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px; color: var(--muted); }
+    .bar {
+      height: 18px;
+      background: rgba(0,0,0,.35);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar > div { height: 100%; transition: width .35s ease; }
+    .hp-fill { background: linear-gradient(90deg, #16a34a, #4ade80); }
+    .mp-fill { background: linear-gradient(90deg, #2563eb, #60a5fa); }
+    .xp-fill { background: linear-gradient(90deg, #9333ea, #c084fc); }
+
+    .mini-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .mini-stat {
+      background: rgba(0,0,0,.18);
+      border: 1px solid var(--border);
+      padding: 9px;
+      border-radius: 12px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .mini-stat strong { display: block; color: var(--text); font-size: 18px; margin-top: 2px; }
+
+    .status-line {
+      min-height: 28px;
+      margin-top: 10px;
+      color: #fde68a;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .actions-panel,
+    .log-panel {
+      padding: 16px;
+    }
+
+    .section-title {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 13px;
+      padding: 13px 16px;
+      color: white;
+      font-weight: 800;
+      cursor: pointer;
+      transition: .15s ease;
+      box-shadow: inset 0 -3px rgba(0,0,0,.16);
+    }
+
+    .btn:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.08); }
+    .btn:active:not(:disabled) { transform: translateY(1px); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    .btn-attack { background: #dc2626; }
+    .btn-skill { background: #7c3aed; }
+    .btn-defend { background: #2563eb; }
+    .btn-heal { background: #16a34a; }
+    .btn-gold { background: #d97706; }
+    .btn-gray { background: #475569; }
+    .btn-danger { background: #991b1b; }
+
+    .turn-tip {
+      text-align: center;
+      margin-top: 11px;
+      color: var(--gold);
+      min-height: 24px;
+      font-weight: 800;
+    }
+
+    #battleLog {
+      height: 245px;
+      overflow-y: auto;
+      background: rgba(3,7,18,.42);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      line-height: 1.6;
+      color: #e2e8f0;
+    }
+
+    .log-line { margin-bottom: 7px; }
+    .log-good { color: #86efac; }
+    .log-bad { color: #fca5a5; }
+    .log-special { color: #fde68a; }
+    .log-info { color: #93c5fd; }
+
+    .between-panel {
+      margin-top: 16px;
+      padding: 18px;
+      text-align: center;
+    }
+
+    .between-actions {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.72);
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      z-index: 10;
+    }
+
+    .modal-card {
+      width: min(620px, 95vw);
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 22px;
+      background: #172033;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .shop-grid {
+      display: grid;
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .shop-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      background: rgba(255,255,255,.055);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 12px;
+    }
+
+    .shop-item h4 { margin: 0 0 4px; }
+    .shop-item p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    .footer-note {
+      text-align: center;
+      color: #94a3b8;
+      margin-top: 16px;
+      font-size: 13px;
+    }
+
+    @media (max-width: 780px) {
+      .class-grid,
+      .battle-grid,
+      .bottom-grid { grid-template-columns: 1fr; }
+      .fighter { min-height: 300px; }
+      .sprite { height: 130px; font-size: 92px; }
+      .topbar { grid-template-columns: 1fr; }
+      .actions { grid-template-columns: 1fr; }
+    }
+  
+
+    /* ===== 寫實奇幻視覺升級 ===== */
+    body {
+      background-color: #07101d;
+      background-image:
+        linear-gradient(rgba(4, 10, 20, .30), rgba(4, 10, 20, .84)),
+        radial-gradient(circle at 50% 18%, rgba(244, 192, 91, .18), transparent 28%),
+        linear-gradient(165deg, #10243a 0%, #08111f 46%, #030711 100%);
+      background-attachment: fixed;
+      overflow-x: hidden;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    body::before {
+      opacity: .72;
+      background:
+        radial-gradient(ellipse at 10% 90%, rgba(31, 74, 83, .55), transparent 34%),
+        radial-gradient(ellipse at 90% 90%, rgba(74, 38, 75, .42), transparent 38%),
+        linear-gradient(transparent 60%, rgba(0, 0, 0, .72));
+    }
+
+    body::after {
+      opacity: .26;
+      background-image:
+        repeating-linear-gradient(90deg, transparent 0 79px, rgba(255,255,255,.025) 80px 81px),
+        repeating-linear-gradient(0deg, transparent 0 79px, rgba(255,255,255,.018) 80px 81px);
+      mask-image: linear-gradient(to bottom, transparent, #000 25%, #000 78%, transparent);
+    }
+
+    .page { position: relative; }
+
+    .title {
+      color: #fff7d6;
+      text-shadow: 0 2px 0 #54320d, 0 8px 28px rgba(0,0,0,.88), 0 0 32px rgba(245, 185, 72, .23);
+    }
+
+    .panel {
+      background: linear-gradient(145deg, rgba(24, 34, 49, .91), rgba(9, 16, 29, .94));
+      border-color: rgba(216, 180, 112, .20);
+      box-shadow: 0 20px 50px rgba(0,0,0,.45), inset 0 1px rgba(255,255,255,.035);
+    }
+
+    #startScreen {
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(6,12,22,.92), rgba(12,20,34,.78), rgba(6,12,22,.92)),
+        radial-gradient(circle at 50% 0%, rgba(233, 178, 79, .18), transparent 42%);
+    }
+
+    #startScreen::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: .34;
+      pointer-events: none;
+      background:
+        linear-gradient(115deg, transparent 0 45%, rgba(255,255,255,.035) 46% 47%, transparent 48%),
+        repeating-linear-gradient(0deg, transparent 0 39px, rgba(255,255,255,.02) 40px 41px);
+    }
+
+    .class-grid { position: relative; z-index: 1; }
+
+    .class-card {
+      overflow: hidden;
+      position: relative;
+      min-height: 360px;
+      background: linear-gradient(160deg, rgba(44, 55, 72, .96), rgba(12, 21, 34, .97));
+      border: 1px solid rgba(255,255,255,.10);
+    }
+
+    .class-card::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0;
+      height: 46%;
+      background: linear-gradient(transparent, rgba(1, 5, 12, .88));
+      pointer-events: none;
+    }
+
+    .class-card > * { position: relative; z-index: 2; }
+
+    .class-card:hover,
+    .class-card.selected {
+      border-color: rgba(250, 204, 103, .86);
+      box-shadow: 0 18px 36px rgba(0,0,0,.42), 0 0 0 1px rgba(250,204,103,.18) inset;
+    }
+
+    .class-icon.class-portrait {
+      display: block;
+      width: calc(100% + 36px);
+      height: 230px;
+      margin: -18px -18px 4px;
+      background-position: center top;
+      background-repeat: no-repeat;
+      background-size: cover;
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      filter: saturate(1.04) contrast(1.05);
+    }
+
+    .class-name { text-shadow: 0 3px 12px rgba(0,0,0,.8); }
+    .class-desc { position: relative; z-index: 3; }
+
+    .battle-grid {
+      --scene: linear-gradient(160deg, #243248, #0a1120);
+      position: relative;
+      isolation: isolate;
+      padding: 24px;
+      border-radius: 25px;
+      overflow: hidden;
+      border: 1px solid rgba(224, 190, 122, .22);
+      background-image:
+        linear-gradient(to bottom, rgba(1,4,9,.10), rgba(2,5,12,.58)),
+        var(--scene);
+      background-size: cover;
+      background-position: center;
+      box-shadow: 0 26px 70px rgba(0,0,0,.48), inset 0 0 90px rgba(0,0,0,.28);
+    }
+
+    .battle-grid::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 50% 100%, rgba(255,255,255,.14), transparent 48%),
+        linear-gradient(90deg, rgba(0,0,0,.34), transparent 28% 72%, rgba(0,0,0,.34));
+      pointer-events: none;
+    }
+
+    .battle-grid::after {
+      content: "";
+      position: absolute;
+      left: -10%; right: -10%; bottom: -14px;
+      height: 72px;
+      z-index: 0;
+      opacity: .58;
+      background: radial-gradient(ellipse, rgba(207,223,232,.20), transparent 65%);
+      filter: blur(10px);
+      pointer-events: none;
+      animation: fogDrift 7s ease-in-out infinite alternate;
+    }
+
+    @keyframes fogDrift {
+      from { transform: translateX(-2%) scaleX(.96); opacity: .40; }
+      to { transform: translateX(3%) scaleX(1.05); opacity: .68; }
+    }
+
+    .fighter {
+      z-index: 1;
+      min-height: 440px;
+      background: linear-gradient(160deg, rgba(13,22,36,.76), rgba(5,10,19,.88));
+      border-color: rgba(255,255,255,.12);
+      backdrop-filter: blur(6px) saturate(1.12);
+    }
+
+    .fighter.enemy-side {
+      background: linear-gradient(160deg, rgba(61,21,28,.70), rgba(8,13,23,.90));
+    }
+
+    .sprite {
+      width: 100%;
+      height: 250px;
+      margin: 4px auto 0;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: contain;
+      filter: drop-shadow(0 20px 18px rgba(0,0,0,.56));
+      transform-origin: center bottom;
+    }
+
+    .sprite::after {
+      content: "";
+      width: 62%;
+      height: 20px;
+      align-self: end;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(0,0,0,.58), transparent 67%);
+      filter: blur(4px);
+      transform: translateY(-7px);
+      pointer-events: none;
+    }
+
+    .sprite.hit {
+      transform: translateX(-12px) rotate(-2deg) scale(.96);
+      filter: drop-shadow(0 0 24px rgba(239,68,68,.94)) brightness(1.14);
+    }
+
+    .sprite.attack {
+      transform: translateX(18px) scale(1.05);
+      filter: drop-shadow(0 18px 18px rgba(0,0,0,.62)) brightness(1.10);
+    }
+
+    .bar {
+      background: rgba(0,0,0,.58);
+      box-shadow: inset 0 2px 5px rgba(0,0,0,.55), 0 1px rgba(255,255,255,.04);
+    }
+
+    .mini-stat { background: rgba(0,0,0,.30); }
+
+    @media (max-width: 780px) {
+      .class-card { min-height: 330px; }
+      .class-icon.class-portrait { height: 205px; }
+      .battle-grid { padding: 12px; }
+      .fighter { min-height: 390px; }
+      .sprite { height: 220px; }
+    }
+
+  </style>
+</head>
+<body>
+  <main class="page">
+    <h1 class="title">⚔️ 勇者之塔：暗影遠征</h1>
+    <p class="subtitle">在森林、地牢、冰峰與深淵之間，展開寫實奇幻風格的回合制冒險</p>
+
+    <section id="startScreen" class="panel">
+      <h2 style="text-align:center; margin-top:0;">選擇你的職業</h2>
+      <p style="text-align:center; color:var(--muted);">每個職業都有不同能力與專屬技能。</p>
+
+      <div class="class-grid">
+        <button class="class-card selected" data-class="warrior">
+          <span class="class-icon class-portrait" data-art="warrior" role="img" aria-label="寫實奇幻戰士"></span>
+          <div class="class-name">戰士</div>
+          <div class="class-desc">生命與防禦較高。專屬技能「震地重擊」能造成高傷害，並有機會讓敵人暈眩。</div>
+        </button>
+
+        <button class="class-card" data-class="mage">
+          <span class="class-icon class-portrait" data-art="mage" role="img" aria-label="寫實奇幻法師"></span>
+          <div class="class-name">法師</div>
+          <div class="class-desc">魔力與技能傷害最高。專屬技能「烈焰火球」會讓敵人持續受到燃燒傷害。</div>
+        </button>
+
+        <button class="class-card" data-class="ranger">
+          <span class="class-icon class-portrait" data-art="ranger" role="img" aria-label="寫實奇幻弓箭手"></span>
+          <div class="class-name">弓箭手</div>
+          <div class="class-desc">速度快、爆擊率高。專屬技能「疾風連射」能連續攻擊兩次。</div>
+        </button>
+      </div>
+
+      <div class="start-actions">
+        <button id="newGameBtn" class="btn btn-gold">開始新冒險</button>
+        <button id="loadGameBtn" class="btn btn-gray">讀取存檔</button>
+      </div>
+    </section>
+
+    <section id="gameScreen" class="hidden">
+      <div class="topbar panel">
+        <div class="top-stats">
+          <span>樓層：<strong id="floorText">1</strong>/10</span>
+          <span>金幣：<strong id="goldText">0</strong> 🪙</span>
+          <span>藥水：<strong id="potionText">0</strong> 🧪</span>
+          <span>連勝：<strong id="winText">0</strong></span>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="saveBtn" class="btn btn-gray">儲存</button>
+          <button id="resetBtn" class="btn btn-danger">重新開始</button>
+        </div>
+      </div>
+
+      <div class="battle-grid">
+        <article class="fighter panel">
+          <div class="name-row">
+            <div class="fighter-name" id="playerName">勇者</div>
+            <div class="level-tag">Lv.<span id="playerLevel">1</span></div>
+          </div>
+
+          <div id="playerSprite" class="sprite" role="img" aria-label="玩家角色"></div>
+
+          <div class="bar-wrap">
+            <div class="bar-label"><span>生命 HP</span><span id="playerHpText">100 / 100</span></div>
+            <div class="bar"><div id="playerHpBar" class="hp-fill" style="width:100%"></div></div>
+          </div>
+
+          <div class="bar-wrap">
+            <div class="bar-label"><span>魔力 MP</span><span id="playerMpText">40 / 40</span></div>
+            <div class="bar"><div id="playerMpBar" class="mp-fill" style="width:100%"></div></div>
+          </div>
+
+          <div class="bar-wrap">
+            <div class="bar-label"><span>經驗值 XP</span><span id="playerXpText">0 / 60</span></div>
+            <div class="bar"><div id="playerXpBar" class="xp-fill" style="width:0%"></div></div>
+          </div>
+
+          <div class="mini-stats">
+            <div class="mini-stat">攻擊<strong id="attackText">15</strong></div>
+            <div class="mini-stat">防禦<strong id="defenseText">5</strong></div>
+            <div class="mini-stat">爆擊<strong id="critText">10%</strong></div>
+          </div>
+          <div id="playerStatus" class="status-line"></div>
+        </article>
+
+        <article class="fighter enemy-side panel">
+          <div class="name-row">
+            <div class="fighter-name" id="enemyName">史萊姆</div>
+            <div class="level-tag">Lv.<span id="enemyLevel">1</span></div>
+          </div>
+
+          <div id="enemySprite" class="sprite" role="img" aria-label="敵人角色"></div>
+
+          <div class="bar-wrap">
+            <div class="bar-label"><span>生命 HP</span><span id="enemyHpText">45 / 45</span></div>
+            <div class="bar"><div id="enemyHpBar" class="hp-fill" style="width:100%"></div></div>
+          </div>
+
+          <div class="mini-stats">
+            <div class="mini-stat">攻擊<strong id="enemyAttackText">10</strong></div>
+            <div class="mini-stat">防禦<strong id="enemyDefenseText">2</strong></div>
+            <div class="mini-stat">獎勵<strong id="enemyRewardText">15🪙</strong></div>
+          </div>
+          <div id="enemyStatus" class="status-line"></div>
+        </article>
+      </div>
+
+      <div class="bottom-grid">
+        <section class="actions-panel panel">
+          <h3 class="section-title">選擇行動</h3>
+          <div class="actions">
+            <button id="attackBtn" class="btn btn-attack">⚔️ 普通攻擊</button>
+            <button id="skillBtn" class="btn btn-skill">✨ 專屬技能</button>
+            <button id="defendBtn" class="btn btn-defend">🛡️ 防禦</button>
+            <button id="healBtn" class="btn btn-heal">🧪 使用藥水</button>
+          </div>
+          <div id="skillInfo" style="margin-top:12px; color:var(--muted); line-height:1.55;"></div>
+          <div id="turnTip" class="turn-tip">輪到你行動！</div>
+        </section>
+
+        <section class="log-panel panel">
+          <h3 class="section-title">戰鬥紀錄</h3>
+          <div id="battleLog" aria-live="polite"></div>
+        </section>
+      </div>
+
+      <section id="betweenPanel" class="between-panel panel hidden">
+        <h2 id="betweenTitle">戰鬥勝利！</h2>
+        <p id="betweenText" style="color:var(--muted);"></p>
+        <div class="between-actions">
+          <button id="nextBattleBtn" class="btn btn-gold">前往下一層</button>
+          <button id="shopBtn" class="btn btn-skill">進入商店</button>
+          <button id="restBtn" class="btn btn-heal">休息恢復</button>
+        </div>
+      </section>
+    </section>
+
+    <p class="footer-note">提示：遊戲會自動存檔，也可以按「儲存」手動保存進度。</p>
+  </main>
+
+  <div id="shopModal" class="modal hidden">
+    <div class="modal-card">
+      <h2 style="margin-top:0;">🏪 冒險商店</h2>
+      <p>目前金幣：<strong id="shopGoldText">0</strong> 🪙</p>
+      <div class="shop-grid">
+        <div class="shop-item">
+          <div><h4>🧪 生命藥水</h4><p>戰鬥中恢復 40% 最大生命。</p></div>
+          <button class="btn btn-heal buy-btn" data-item="potion">20 🪙</button>
+        </div>
+        <div class="shop-item">
+          <div><h4>🗡️ 強化武器</h4><p>永久增加 4 點攻擊力。</p></div>
+          <button class="btn btn-attack buy-btn" data-item="attack">45 🪙</button>
+        </div>
+        <div class="shop-item">
+          <div><h4>🛡️ 強化護甲</h4><p>永久增加 3 點防禦力。</p></div>
+          <button class="btn btn-defend buy-btn" data-item="defense">45 🪙</button>
+        </div>
+        <div class="shop-item">
+          <div><h4>💖 生命水晶</h4><p>永久增加 18 點最大生命。</p></div>
+          <button class="btn btn-gold buy-btn" data-item="maxHp">55 🪙</button>
+        </div>
+        <div class="shop-item">
+          <div><h4>🔷 魔力水晶</h4><p>永久增加 10 點最大魔力。</p></div>
+          <button class="btn btn-skill buy-btn" data-item="maxMp">50 🪙</button>
+        </div>
+      </div>
+      <button id="closeShopBtn" class="btn btn-gray" style="width:100%;">離開商店</button>
+    </div>
+  </div>
+
+  <div id="endModal" class="modal hidden">
+    <div class="modal-card" style="text-align:center;">
+      <div id="endIcon" style="font-size:82px;">🏆</div>
+      <h2 id="endTitle">你成功登上塔頂！</h2>
+      <p id="endText" style="color:var(--muted); line-height:1.7;"></p>
+      <button id="endRestartBtn" class="btn btn-gold">再玩一次</button>
+    </div>
+  </div>
+
+  <script>
+    "use strict";
+
+
+    // ===== 內嵌 SVG 奇幻插圖：不需要外部圖片或網路 =====
+    function svgUrl(svg) {
+      return `url("data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}")`;
+    }
+
+    function heroSvg(type) {
+      const cfg = {
+        warrior: { bg1: "#34465d", bg2: "#101725", metal1: "#e5e7eb", metal2: "#596579", cloth: "#7f1d1d", glow: "#f4c15d", hair: "#412416" },
+        mage:    { bg1: "#433268", bg2: "#11152b", metal1: "#d8c8ff", metal2: "#655094", cloth: "#34205f", glow: "#6fd8ff", hair: "#c9d6e8" },
+        ranger:  { bg1: "#244d3d", bg2: "#0d1b1c", metal1: "#c8b484", metal2: "#615337", cloth: "#254d36", glow: "#9de088", hair: "#4a2e1f" }
+      }[type];
+
+      const special = type === "warrior" ? `
+        <path d="M42 284 Q80 230 126 224 L153 264 L113 348 L54 332Z" fill="url(#metal)" stroke="#edf3f8" stroke-width="5"/>
+        <path d="M61 285 L111 257 L136 282 L112 334 L71 324Z" fill="#7d1d22" stroke="#f2c56e" stroke-width="4"/>
+        <path d="M87 277 L87 330 M66 304 L119 304" stroke="#f6d77e" stroke-width="8" stroke-linecap="round"/>
+        <path d="M291 118 L345 268" stroke="#bfc7d2" stroke-width="14" stroke-linecap="round"/>
+        <path d="M276 105 L326 143" stroke="#f7fafc" stroke-width="16" stroke-linecap="round"/>
+      ` : type === "mage" ? `
+        <path d="M326 82 L326 348" stroke="#5e3820" stroke-width="15" stroke-linecap="round"/>
+        <path d="M326 70 C286 78 286 122 326 130 C366 122 366 78 326 70Z" fill="url(#orb)" stroke="#b7f2ff" stroke-width="5"/>
+        <circle cx="326" cy="100" r="18" fill="#e2fbff" opacity=".92"/>
+        <path d="M135 127 Q210 27 284 128 L259 199 L160 199Z" fill="#2d1f59" stroke="#8b79c8" stroke-width="6"/>
+      ` : `
+        <path d="M330 72 Q256 203 326 354" fill="none" stroke="#9a7147" stroke-width="13" stroke-linecap="round"/>
+        <path d="M329 72 Q382 207 326 354" fill="none" stroke="#c9ab72" stroke-width="4"/>
+        <path d="M330 210 L252 210" stroke="#ece7d2" stroke-width="5"/>
+        <path d="M252 210 L279 195 M252 210 L279 226" stroke="#ece7d2" stroke-width="5" stroke-linecap="round"/>
+        <path d="M141 128 Q205 61 274 132 L253 193 L161 193Z" fill="#1d3d2b" stroke="#7a996e" stroke-width="6"/>
+      `;
+
+      return svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 420">
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${cfg.bg1}"/><stop offset="1" stop-color="${cfg.bg2}"/></linearGradient>
+          <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${cfg.metal1}"/><stop offset=".45" stop-color="${cfg.metal2}"/><stop offset=".7" stop-color="#f3f4f6"/><stop offset="1" stop-color="#343d4d"/></linearGradient>
+          <radialGradient id="skin"><stop stop-color="#f3c7a5"/><stop offset=".7" stop-color="#b77453"/><stop offset="1" stop-color="#75422f"/></radialGradient>
+          <radialGradient id="orb"><stop stop-color="#ffffff"/><stop offset=".28" stop-color="${cfg.glow}"/><stop offset="1" stop-color="#244b80"/></radialGradient>
+          <filter id="shadow"><feDropShadow dx="0" dy="14" stdDeviation="12" flood-opacity=".58"/></filter>
+          <filter id="glow"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <rect width="420" height="420" fill="url(#bg)"/>
+        <circle cx="210" cy="177" r="150" fill="${cfg.glow}" opacity=".08" filter="url(#glow)"/>
+        <path d="M0 340 Q95 290 210 315 T420 334 V420 H0Z" fill="#05080f" opacity=".72"/>
+        <g filter="url(#shadow)">
+          <path d="M91 408 Q105 273 169 248 L251 248 Q321 276 337 408Z" fill="${cfg.cloth}" stroke="#202938" stroke-width="8"/>
+          <path d="M105 396 Q124 276 168 254 L195 289 L158 404Z" fill="url(#metal)"/>
+          <path d="M315 396 Q295 278 252 254 L226 289 L262 404Z" fill="url(#metal)"/>
+          <path d="M171 240 L168 279 Q209 306 252 279 L249 240Z" fill="url(#skin)"/>
+          <ellipse cx="210" cy="183" rx="72" ry="88" fill="url(#skin)"/>
+          <path d="M143 180 Q144 87 210 78 Q282 89 279 180 Q259 125 211 121 Q162 126 143 180Z" fill="${cfg.hair}"/>
+          <path d="M154 173 Q160 127 210 114 Q260 126 272 173 L257 126 Q206 91 160 128Z" fill="url(#metal)" opacity="${type === 'warrior' ? '.96' : '.22'}"/>
+          <path d="M161 183 Q180 167 199 183" fill="none" stroke="#3d291e" stroke-width="7" stroke-linecap="round"/>
+          <path d="M220 183 Q241 167 260 183" fill="none" stroke="#3d291e" stroke-width="7" stroke-linecap="round"/>
+          <ellipse cx="181" cy="190" rx="6" ry="8" fill="#16120f"/><ellipse cx="239" cy="190" rx="6" ry="8" fill="#16120f"/>
+          <path d="M210 190 L201 222 L217 224" fill="none" stroke="#8b533d" stroke-width="5" stroke-linecap="round"/>
+          <path d="M184 239 Q210 257 237 238" fill="none" stroke="#6f302a" stroke-width="6" stroke-linecap="round"/>
+          <path d="M169 276 Q210 302 251 276 L267 408 H153Z" fill="${cfg.cloth}" opacity=".94"/>
+          <path d="M171 297 L249 297" stroke="${cfg.glow}" stroke-width="5" opacity=".62"/>
+          ${special}
+        </g>
+        <rect x="10" y="10" width="400" height="400" rx="26" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="3"/>
+      </svg>`);
+    }
+
+    function enemySvg(type) {
+      const frame = (c1, c2, glow, body) => svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 420">
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient>
+          <radialGradient id="g"><stop stop-color="${glow}"/><stop offset="1" stop-color="${glow}" stop-opacity="0"/></radialGradient>
+          <filter id="s"><feDropShadow dx="0" dy="16" stdDeviation="13" flood-opacity=".7"/></filter>
+          <filter id="b"><feGaussianBlur stdDeviation="9"/></filter>
+        </defs>
+        <rect width="420" height="420" rx="26" fill="url(#bg)"/>
+        <circle cx="210" cy="190" r="165" fill="url(#g)" opacity=".30" filter="url(#b)"/>
+        <path d="M0 350 Q98 303 210 330 T420 345 V420 H0Z" fill="#02050b" opacity=".72"/>
+        <g filter="url(#s)">${body}</g>
+        <rect x="10" y="10" width="400" height="400" rx="26" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="3"/>
+      </svg>`);
+
+      if (type === "slime") return frame("#204a3a", "#07140f", "#68f0a3", `
+        <path d="M90 323 Q88 227 135 160 Q164 116 210 120 Q262 119 293 166 Q336 229 329 323 Q280 366 210 365 Q141 365 90 323Z" fill="#3eaa68" stroke="#98f0b5" stroke-width="7"/>
+        <path d="M117 263 Q128 166 210 157 Q292 170 307 263 Q283 222 249 235 Q210 250 173 233 Q138 217 117 263Z" fill="#70d995" opacity=".52"/>
+        <ellipse cx="167" cy="229" rx="18" ry="25" fill="#06120b"/><ellipse cx="253" cy="229" rx="18" ry="25" fill="#06120b"/>
+        <circle cx="160" cy="221" r="6" fill="#d9ffe8"/><circle cx="246" cy="221" r="6" fill="#d9ffe8"/>
+        <path d="M171 293 Q210 316 250 291" fill="none" stroke="#164d2c" stroke-width="10" stroke-linecap="round"/>
+      `);
+      if (type === "bat") return frame("#3e274e", "#0d0a16", "#c189ff", `
+        <path d="M197 196 Q129 90 32 151 Q104 171 73 282 Q142 229 190 282Z" fill="#4c315b" stroke="#9c70b5" stroke-width="7"/>
+        <path d="M223 196 Q291 90 388 151 Q316 171 347 282 Q278 229 230 282Z" fill="#4c315b" stroke="#9c70b5" stroke-width="7"/>
+        <ellipse cx="210" cy="228" rx="69" ry="91" fill="#24182d" stroke="#87619a" stroke-width="8"/>
+        <path d="M169 157 L186 111 L204 168 M251 157 L234 111 L216 168" fill="#392243" stroke="#9c70b5" stroke-width="6"/>
+        <ellipse cx="184" cy="220" rx="12" ry="16" fill="#ff566d"/><ellipse cx="236" cy="220" rx="12" ry="16" fill="#ff566d"/>
+        <path d="M184 266 L197 289 L210 266 L223 289 L237 264" fill="#f5f0ff"/>
+      `);
+      if (type === "skeleton") return frame("#343b45", "#090d12", "#d9e7ef", `
+        <path d="M151 184 Q150 99 210 85 Q270 100 269 184 L255 235 L224 249 L196 249 L165 235Z" fill="#d8d2bd" stroke="#6c685d" stroke-width="8"/>
+        <ellipse cx="181" cy="181" rx="24" ry="30" fill="#11151a"/><ellipse cx="239" cy="181" rx="24" ry="30" fill="#11151a"/>
+        <circle cx="181" cy="182" r="8" fill="#6cf1ff"/><circle cx="239" cy="182" r="8" fill="#6cf1ff"/>
+        <path d="M210 194 L197 220 L223 220Z" fill="#3e3b35"/>
+        <path d="M181 232 H239 M188 232 V253 M203 232 V256 M218 232 V256 M233 232 V253" stroke="#554f45" stroke-width="7"/>
+        <path d="M164 260 L104 345 M256 260 L316 345 M166 278 H254 M188 275 L164 379 M232 275 L256 379" stroke="#d8d2bd" stroke-width="18" stroke-linecap="round"/>
+        <path d="M108 338 L79 373 M312 338 L343 372" stroke="#d8d2bd" stroke-width="16" stroke-linecap="round"/>
+      `);
+      if (type === "boar") return frame("#5a3525", "#160b08", "#ef9b55", `
+        <ellipse cx="210" cy="226" rx="132" ry="115" fill="#5b3829" stroke="#9a674c" stroke-width="8"/>
+        <path d="M112 148 L70 84 Q144 90 162 142 M308 148 L350 84 Q276 90 258 142" fill="#3b241b" stroke="#8d5b43" stroke-width="8"/>
+        <path d="M92 191 Q210 79 328 191 Q294 130 210 122 Q126 130 92 191Z" fill="#38221b"/>
+        <ellipse cx="210" cy="263" rx="79" ry="61" fill="#8c5940"/>
+        <ellipse cx="184" cy="257" rx="11" ry="15" fill="#22130e"/><ellipse cx="236" cy="257" rx="11" ry="15" fill="#22130e"/>
+        <ellipse cx="160" cy="205" rx="13" ry="16" fill="#f0b14e"/><ellipse cx="260" cy="205" rx="13" ry="16" fill="#f0b14e"/>
+        <path d="M142 280 Q109 304 106 337 Q151 324 169 294 M278 280 Q311 304 314 337 Q269 324 251 294" fill="#e8ddd0" stroke="#8f7964" stroke-width="6"/>
+      `);
+      if (type === "golem") return frame("#5d5144", "#171411", "#ffc65a", `
+        <path d="M119 169 L164 84 L257 80 L307 167 L286 350 L135 350Z" fill="#6d665c" stroke="#aaa093" stroke-width="9"/>
+        <path d="M164 84 L199 43 L257 80 M119 169 L62 244 L98 321 L139 293 M307 167 L361 244 L324 321 L283 293" fill="#5b554d" stroke="#999084" stroke-width="9"/>
+        <path d="M164 175 L194 153 L226 153 L257 175 L246 230 L210 247 L174 230Z" fill="#3d3a35"/>
+        <path d="M179 184 L199 177 L197 201 L177 207 M241 184 L221 177 L223 201 L243 207" fill="#ffc94f"/>
+        <path d="M210 242 L210 337 M160 277 L260 277" stroke="#d7a948" stroke-width="6" opacity=".7"/>
+      `);
+      if (type === "ninja") return frame("#302d4a", "#090812", "#8a7dff", `
+        <path d="M118 361 Q129 185 162 132 Q210 84 258 132 Q292 185 304 361Z" fill="#171826" stroke="#4c4c68" stroke-width="8"/>
+        <path d="M139 188 Q158 100 210 94 Q262 101 281 188 L259 243 H161Z" fill="#11121b" stroke="#555873" stroke-width="7"/>
+        <path d="M151 185 Q210 153 270 185 L257 222 Q210 239 164 222Z" fill="#342d45"/>
+        <path d="M168 192 L199 188 L196 205 L166 210 M252 192 L221 188 L224 205 L254 210" fill="#f0c15d"/>
+        <path d="M73 113 L339 343 M347 112 L82 344" stroke="#c8d2dc" stroke-width="12" stroke-linecap="round"/>
+        <path d="M58 97 L97 124 M362 96 L325 126" stroke="#e8eef4" stroke-width="20"/>
+      `);
+      if (type === "wolf") return frame("#29475a", "#07121b", "#9fe7ff", `
+        <path d="M126 173 L102 75 L177 130 M294 173 L318 75 L243 130" fill="#5c6e78" stroke="#a9c2cf" stroke-width="8"/>
+        <path d="M99 247 Q108 128 210 111 Q312 128 321 247 Q296 342 210 363 Q124 342 99 247Z" fill="#697c86" stroke="#b9ced8" stroke-width="8"/>
+        <path d="M126 184 Q210 111 294 184 Q269 146 210 138 Q151 146 126 184Z" fill="#374852"/>
+        <ellipse cx="164" cy="221" rx="18" ry="15" fill="#8fe7ff"/><ellipse cx="256" cy="221" rx="18" ry="15" fill="#8fe7ff"/>
+        <path d="M210 247 L181 286 L210 302 L239 286Z" fill="#20262a"/>
+        <path d="M163 304 Q210 337 258 303" fill="none" stroke="#f0f4f5" stroke-width="8"/>
+        <path d="M181 307 L194 334 L208 308 L223 334 L239 307" fill="#f7fbff"/>
+      `);
+      if (type === "wizard") return frame("#3f214d", "#0d0714", "#d36aff", `
+        <path d="M96 368 Q111 199 151 143 Q210 82 269 143 Q310 199 324 368Z" fill="#25102f" stroke="#70407e" stroke-width="9"/>
+        <path d="M117 162 Q210 34 303 162 L263 201 H157Z" fill="#32143f" stroke="#88509a" stroke-width="8"/>
+        <path d="M156 177 Q210 138 264 177 L252 244 Q210 268 168 244Z" fill="#c7c0ab"/>
+        <ellipse cx="183" cy="204" rx="18" ry="24" fill="#0d0b10"/><ellipse cx="237" cy="204" rx="18" ry="24" fill="#0d0b10"/>
+        <circle cx="183" cy="204" r="7" fill="#d85fff"/><circle cx="237" cy="204" r="7" fill="#d85fff"/>
+        <path d="M210 213 L198 237 L222 237Z" fill="#39342d"/>
+        <path d="M322 83 L322 350" stroke="#6d4425" stroke-width="14"/>
+        <circle cx="322" cy="76" r="33" fill="#be52e4" stroke="#f2c8ff" stroke-width="6"/>
+      `);
+      if (type === "giant") return frame("#5b4d36", "#171108", "#ffd073", `
+        <path d="M98 383 Q90 235 132 136 Q210 72 288 136 Q330 235 322 383Z" fill="#6f5a3d" stroke="#ad966a" stroke-width="9"/>
+        <ellipse cx="210" cy="168" rx="86" ry="95" fill="#9d774f"/>
+        <path d="M128 158 Q142 72 210 61 Q278 72 292 158 Q257 112 210 110 Q162 112 128 158Z" fill="#493522"/>
+        <path d="M145 178 L190 168 L185 195 L142 200 M275 178 L230 168 L235 195 L278 200" fill="#ffc14d"/>
+        <path d="M170 245 Q210 267 251 244" fill="none" stroke="#4c2b1f" stroke-width="11"/>
+        <path d="M86 228 L28 361 M334 228 L392 361" stroke="#9d774f" stroke-width="38" stroke-linecap="round"/>
+        <path d="M33 353 L17 390 M386 353 L405 390" stroke="#c49a69" stroke-width="26" stroke-linecap="round"/>
+      `);
+      return frame("#531e23", "#110407", "#ff6b3d", `
+        <path d="M92 279 Q58 166 143 113 L124 43 L196 103 Q210 91 224 103 L296 43 L277 113 Q362 166 328 279 Q294 363 210 372 Q126 363 92 279Z" fill="#7d2025" stroke="#cc5a45" stroke-width="9"/>
+        <path d="M99 178 Q39 137 23 221 Q69 200 97 236 M321 178 Q381 137 397 221 Q351 200 323 236" fill="#5e1820" stroke="#b84539" stroke-width="8"/>
+        <path d="M126 174 Q210 94 294 174 Q261 126 210 122 Q159 126 126 174Z" fill="#3d1117"/>
+        <path d="M145 202 L194 187 L188 221 L142 226 M275 202 L226 187 L232 221 L278 226" fill="#ffd05a"/>
+        <path d="M210 226 L171 277 L210 294 L249 277Z" fill="#3d0d0f"/>
+        <path d="M156 307 Q210 342 265 306" fill="none" stroke="#f6d2b1" stroke-width="9"/>
+        <path d="M177 312 L192 346 L210 315 L229 346 L246 311" fill="#fff1db"/>
+        <path d="M211 286 Q181 308 210 337 Q239 308 211 286Z" fill="#ff9b48" opacity=".88"/>
+      `);
+    }
+
+    function sceneSvg(kind) {
+      const scenes = {
+        forest: { sky1: "#1a4150", sky2: "#071217", glow: "#79cba1", ground: "#142619", accent: "#54745f", object: `
+          <path d="M0 390 Q150 300 310 350 T620 340 T930 345 T1200 320 V520 H0Z" fill="#102016"/>
+          <g fill="#0b1710"><path d="M95 370 L135 96 L167 370Z"/><path d="M178 373 L225 55 L267 373Z"/><path d="M985 370 L1035 74 L1072 370Z"/><path d="M1070 375 L1128 115 L1162 375Z"/></g>
+          <g fill="#183b2b" opacity=".9"><circle cx="128" cy="125" r="82"/><circle cx="224" cy="93" r="98"/><circle cx="1031" cy="110" r="92"/><circle cx="1125" cy="140" r="73"/></g>
+          <path d="M560 328 Q600 220 640 328Z" fill="#263c32"/><rect x="588" y="235" width="25" height="98" fill="#17271f"/>
+        `},
+        dungeon: { sky1: "#313945", sky2: "#090d13", glow: "#d8b56a", ground: "#161516", accent: "#665b4b", object: `
+          <rect y="0" width="1200" height="520" fill="#11151c" opacity=".24"/>
+          <g fill="#262a31" stroke="#3f4650" stroke-width="5"><rect x="0" y="50" width="180" height="360"/><rect x="1020" y="50" width="180" height="360"/><path d="M420 390 V190 Q600 25 780 190 V390Z"/></g>
+          <path d="M465 390 V210 Q600 80 735 210 V390Z" fill="#070a0f"/>
+          <g fill="#ad7d32"><circle cx="260" cy="240" r="14"/><circle cx="940" cy="240" r="14"/></g>
+          <g fill="#f1ba56" opacity=".75"><path d="M260 240 Q228 183 260 157 Q292 183 260 240Z"/><path d="M940 240 Q908 183 940 157 Q972 183 940 240Z"/></g>
+          <path d="M0 402 H1200 V520 H0Z" fill="#131418"/><path d="M0 430 H1200 M0 476 H1200" stroke="#2d3036" stroke-width="4"/>
+        `},
+        ice: { sky1: "#31516a", sky2: "#09131f", glow: "#a9edff", ground: "#142331", accent: "#6a99b2", object: `
+          <path d="M0 385 L145 203 L281 377 L407 155 L563 382 L735 114 L886 380 L1034 188 L1200 380 V520 H0Z" fill="#23384a"/>
+          <path d="M157 205 L221 289 L180 274 L137 315Z M420 157 L496 253 L447 238 L393 285Z M748 117 L829 226 L773 208 L720 264Z M1047 191 L1118 285 L1070 270 L1025 310Z" fill="#b8e7f5" opacity=".75"/>
+          <path d="M0 395 Q180 370 355 399 T700 394 T1030 400 T1200 382 V520 H0Z" fill="#d3eef7" opacity=".32"/>
+          <g fill="#e7fbff" opacity=".55"><circle cx="120" cy="90" r="3"/><circle cx="316" cy="142" r="4"/><circle cx="605" cy="78" r="3"/><circle cx="914" cy="126" r="4"/><circle cx="1107" cy="70" r="3"/></g>
+        `},
+        abyss: { sky1: "#52202d", sky2: "#10050a", glow: "#ff6e3d", ground: "#211016", accent: "#8e3e37", object: `
+          <path d="M0 402 L180 320 L296 366 L425 245 L545 366 L697 205 L846 362 L1003 276 L1200 390 V520 H0Z" fill="#281017"/>
+          <path d="M0 440 Q160 410 318 445 T635 438 T950 448 T1200 428 V520 H0Z" fill="#12070a"/>
+          <g fill="#ff5a30" opacity=".55"><path d="M94 440 L135 327 L168 440Z"/><path d="M524 438 L570 302 L607 438Z"/><path d="M980 439 L1026 317 L1062 439Z"/></g>
+          <path d="M485 276 Q600 105 715 276 L683 366 H517Z" fill="#1a0b10" stroke="#6f2a2c" stroke-width="7"/>
+          <circle cx="600" cy="205" r="37" fill="#ff6e36" opacity=".7"/>
+        `}
+      };
+      const s = scenes[kind];
+      return svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${s.sky1}"/><stop offset="1" stop-color="${s.sky2}"/></linearGradient>
+          <radialGradient id="light"><stop stop-color="${s.glow}" stop-opacity=".72"/><stop offset="1" stop-color="${s.glow}" stop-opacity="0"/></radialGradient>
+          <filter id="blur"><feGaussianBlur stdDeviation="14"/></filter>
+        </defs>
+        <rect width="1200" height="520" fill="url(#sky)"/>
+        <ellipse cx="600" cy="120" rx="310" ry="190" fill="url(#light)" opacity=".34" filter="url(#blur)"/>
+        ${s.object}
+        <rect y="410" width="1200" height="110" fill="${s.ground}" opacity=".72"/>
+        <path d="M0 412 Q200 385 400 415 T800 410 T1200 400" fill="none" stroke="${s.accent}" stroke-width="7" opacity=".30"/>
+        <rect width="1200" height="520" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="5"/>
+      </svg>`);
+    }
+
+    const ART = {
+      heroes: {
+        warrior: heroSvg("warrior"),
+        mage: heroSvg("mage"),
+        ranger: heroSvg("ranger")
+      },
+      enemies: {
+        slime: enemySvg("slime"),
+        bat: enemySvg("bat"),
+        skeleton: enemySvg("skeleton"),
+        boar: enemySvg("boar"),
+        golem: enemySvg("golem"),
+        ninja: enemySvg("ninja"),
+        wolf: enemySvg("wolf"),
+        wizard: enemySvg("wizard"),
+        giant: enemySvg("giant"),
+        dragon: enemySvg("dragon")
+      },
+      scenes: {
+        forest: sceneSvg("forest"),
+        dungeon: sceneSvg("dungeon"),
+        ice: sceneSvg("ice"),
+        abyss: sceneSvg("abyss")
+      }
+    };
+
+    function sceneForFloor(floor) {
+      if (floor <= 2) return ART.scenes.forest;
+      if (floor <= 5) return ART.scenes.dungeon;
+      if (floor <= 8) return ART.scenes.ice;
+      return ART.scenes.abyss;
+    }
+
+    const SAVE_KEY = "heroTowerTurnBasedSaveV1";
+
+    const classData = {
+      warrior: {
+        name: "戰士",
+        icon: "🛡️",
+        art: "warrior",
+        maxHp: 125,
+        maxMp: 36,
+        attack: 17,
+        defense: 8,
+        crit: 0.10,
+        skillName: "震地重擊",
+        skillCost: 14,
+        skillText: "造成約 1.9 倍傷害，並有 35% 機率使敵人暈眩一回合。"
+      },
+      mage: {
+        name: "法師",
+        icon: "🧙",
+        art: "mage",
+        maxHp: 88,
+        maxMp: 68,
+        attack: 19,
+        defense: 4,
+        crit: 0.12,
+        skillName: "烈焰火球",
+        skillCost: 18,
+        skillText: "造成約 2.1 倍傷害，並讓敵人燃燒兩回合。"
+      },
+      ranger: {
+        name: "弓箭手",
+        icon: "🏹",
+        art: "ranger",
+        maxHp: 103,
+        maxMp: 48,
+        attack: 16,
+        defense: 6,
+        crit: 0.22,
+        skillName: "疾風連射",
+        skillCost: 16,
+        skillText: "快速攻擊兩次，每一箭都可能爆擊。"
+      }
+    };
+
+    const enemyTemplates = [
+      { name: "森林史萊姆", icon: "🟢", art: "slime", hp: 48, attack: 10, defense: 2, xp: 24, gold: 14 },
+      { name: "洞穴蝙蝠", icon: "🦇", art: "bat", hp: 62, attack: 13, defense: 3, xp: 30, gold: 18 },
+      { name: "骷髏士兵", icon: "💀", art: "skeleton", hp: 82, attack: 16, defense: 5, xp: 38, gold: 23 },
+      { name: "狂暴野豬", icon: "🐗", art: "boar", hp: 105, attack: 20, defense: 6, xp: 47, gold: 29 },
+      { name: "石像守衛", icon: "🗿", art: "golem", hp: 155, attack: 24, defense: 10, xp: 78, gold: 48, boss: true },
+      { name: "暗影忍者", icon: "🥷", art: "ninja", hp: 135, attack: 27, defense: 8, xp: 62, gold: 38 },
+      { name: "冰霜巨狼", icon: "🐺", art: "wolf", hp: 165, attack: 30, defense: 9, xp: 72, gold: 44 },
+      { name: "詛咒巫師", icon: "🧟", art: "wizard", hp: 190, attack: 33, defense: 10, xp: 84, gold: 52 },
+      { name: "雷霆巨人", icon: "🧌", art: "giant", hp: 235, attack: 37, defense: 13, xp: 102, gold: 64 },
+      { name: "深淵魔龍", icon: "🐉", art: "dragon", hp: 340, attack: 43, defense: 16, xp: 180, gold: 120, boss: true }
+    ];
+
+    let state = null;
+    let selectedClass = "warrior";
+    let actionLocked = false;
+
+    const $ = (id) => document.getElementById(id);
+    const startScreen = $("startScreen");
+    const gameScreen = $("gameScreen");
+    const battleLog = $("battleLog");
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function randomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function chance(probability) {
+      return Math.random() < probability;
+    }
+
+    function createInitialState(classKey) {
+      const c = classData[classKey];
+      return {
+        selectedClass: classKey,
+        floor: 1,
+        gold: 25,
+        potions: 2,
+        wins: 0,
+        battleOver: false,
+        player: {
+          classKey,
+          name: `勇者・${c.name}`,
+          icon: c.icon,
+          level: 1,
+          xp: 0,
+          xpToNext: 60,
+          hp: c.maxHp,
+          maxHp: c.maxHp,
+          mp: c.maxMp,
+          maxMp: c.maxMp,
+          attack: c.attack,
+          defense: c.defense,
+          crit: c.crit,
+          defending: false
+        },
+        enemy: null,
+        turnCount: 1,
+        restUsedThisFloor: false
+      };
+    }
+
+    function makeEnemy(floor) {
+      const t = enemyTemplates[floor - 1];
+      const scale = 1 + Math.max(0, floor - 1) * 0.035;
+      const maxHp = Math.round(t.hp * scale);
+      return {
+        ...t,
+        level: floor,
+        hp: maxHp,
+        maxHp,
+        attack: Math.round(t.attack * scale),
+        defense: Math.round(t.defense * scale),
+        stunned: false,
+        burnTurns: 0,
+        burnDamage: 0
+      };
+    }
+
+    function startNewGame() {
+      state = createInitialState(selectedClass);
+      state.enemy = makeEnemy(1);
+      startScreen.classList.add("hidden");
+      gameScreen.classList.remove("hidden");
+      $("betweenPanel").classList.add("hidden");
+      battleLog.innerHTML = "";
+      log(`你選擇了「${classData[selectedClass].name}」，冒險開始！`, "info");
+      log(`第 1 層出現了 ${state.enemy.name}！`, "special");
+      updateUI();
+      saveGame(true);
+    }
+
+    function loadGame() {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) {
+        alert("目前沒有存檔，請先開始新冒險。");
+        return;
+      }
+
+      try {
+        state = JSON.parse(raw);
+        if (!state || !state.player || !state.selectedClass) throw new Error("存檔格式錯誤");
+        selectedClass = state.selectedClass;
+        startScreen.classList.add("hidden");
+        gameScreen.classList.remove("hidden");
+        battleLog.innerHTML = "";
+        log("已讀取存檔。", "info");
+        if (state.battleOver) {
+          showBetweenBattle("進度已恢復", "你可以繼續前往下一層、休息或購物。", state.floor >= 10);
+        } else {
+          $("betweenPanel").classList.add("hidden");
+          log(`${state.enemy.name} 正在等著你！`, "special");
+        }
+        updateUI();
+      } catch (error) {
+        alert("存檔損壞，無法讀取。");
+      }
+    }
+
+    function saveGame(silent = false) {
+      if (!state) return;
+      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+      if (!silent) log("遊戲已儲存。", "info");
+    }
+
+    function resetGame() {
+      if (!confirm("確定要刪除進度並重新開始嗎？")) return;
+      localStorage.removeItem(SAVE_KEY);
+      state = null;
+      gameScreen.classList.add("hidden");
+      startScreen.classList.remove("hidden");
+      $("shopModal").classList.add("hidden");
+      $("endModal").classList.add("hidden");
+      actionLocked = false;
+    }
+
+    function log(message, type = "") {
+      const line = document.createElement("div");
+      line.className = `log-line ${type ? `log-${type}` : ""}`;
+      line.textContent = `• ${message}`;
+      battleLog.appendChild(line);
+      battleLog.scrollTop = battleLog.scrollHeight;
+    }
+
+    function updateUI() {
+      if (!state) return;
+      const p = state.player;
+      const e = state.enemy;
+      const c = classData[p.classKey];
+
+      $("floorText").textContent = state.floor;
+      $("goldText").textContent = state.gold;
+      $("potionText").textContent = state.potions;
+      $("winText").textContent = state.wins;
+
+      $("playerName").textContent = p.name;
+      $("playerSprite").style.backgroundImage = ART.heroes[p.classKey] || ART.heroes.warrior;
+      $("playerSprite").setAttribute("aria-label", p.name);
+      $("gameScreen").style.setProperty("--scene", sceneForFloor(state.floor));
+      const battleGrid = document.querySelector(".battle-grid");
+      if (battleGrid) battleGrid.style.setProperty("--scene", sceneForFloor(state.floor));
+      $("playerLevel").textContent = p.level;
+      $("playerHpText").textContent = `${Math.max(0, p.hp)} / ${p.maxHp}`;
+      $("playerMpText").textContent = `${p.mp} / ${p.maxMp}`;
+      $("playerXpText").textContent = `${p.xp} / ${p.xpToNext}`;
+      $("playerHpBar").style.width = `${clamp((p.hp / p.maxHp) * 100, 0, 100)}%`;
+      $("playerMpBar").style.width = `${clamp((p.mp / p.maxMp) * 100, 0, 100)}%`;
+      $("playerXpBar").style.width = `${clamp((p.xp / p.xpToNext) * 100, 0, 100)}%`;
+      $("attackText").textContent = p.attack;
+      $("defenseText").textContent = p.defense;
+      $("critText").textContent = `${Math.round(p.crit * 100)}%`;
+      $("playerStatus").textContent = p.defending ? "🛡️ 防禦姿態：下一次受到的傷害減半" : "";
+
+      if (e) {
+        $("enemyName").textContent = e.boss ? `👑 ${e.name}` : e.name;
+        $("enemySprite").style.backgroundImage = ART.enemies[e.art] || ART.enemies.slime;
+        $("enemySprite").setAttribute("aria-label", e.name);
+        $("enemyLevel").textContent = e.level;
+        $("enemyHpText").textContent = `${Math.max(0, e.hp)} / ${e.maxHp}`;
+        $("enemyHpBar").style.width = `${clamp((e.hp / e.maxHp) * 100, 0, 100)}%`;
+        $("enemyAttackText").textContent = e.attack;
+        $("enemyDefenseText").textContent = e.defense;
+        $("enemyRewardText").textContent = `${e.gold}🪙`;
+
+        const enemyStatuses = [];
+        if (e.stunned) enemyStatuses.push("💫 暈眩");
+        if (e.burnTurns > 0) enemyStatuses.push(`🔥 燃燒 ${e.burnTurns} 回合`);
+        $("enemyStatus").textContent = enemyStatuses.join("　");
+      }
+
+      $("skillBtn").textContent = `✨ ${c.skillName}（${c.skillCost} MP）`;
+      $("skillInfo").textContent = `${c.skillName}：${c.skillText}`;
+      $("healBtn").textContent = `🧪 使用藥水（剩 ${state.potions}）`;
+      $("shopGoldText").textContent = state.gold;
+
+      const disabled = actionLocked || state.battleOver || p.hp <= 0;
+      $("attackBtn").disabled = disabled;
+      $("skillBtn").disabled = disabled || p.mp < c.skillCost;
+      $("defendBtn").disabled = disabled;
+      $("healBtn").disabled = disabled || state.potions <= 0 || p.hp >= p.maxHp;
+      $("turnTip").textContent = state.battleOver ? "戰鬥已結束" : (actionLocked ? "敵人正在行動……" : "輪到你行動！");
+    }
+
+    function animateSprite(id, className) {
+      const el = $(id);
+      el.classList.add(className);
+      setTimeout(() => el.classList.remove(className), 240);
+    }
+
+    function calculateDamage(attackerAttack, defenderDefense, multiplier = 1, critRate = 0) {
+      const variance = randomInt(90, 110) / 100;
+      const critical = chance(critRate);
+      const critMultiplier = critical ? 1.65 : 1;
+      const raw = attackerAttack * multiplier * variance * critMultiplier;
+      const damage = Math.max(1, Math.round(raw - defenderDefense * 0.7));
+      return { damage, critical };
+    }
+
+    function playerAttack() {
+      if (!canAct()) return;
+      lockActions();
+      animateSprite("playerSprite", "attack");
+      const result = calculateDamage(state.player.attack, state.enemy.defense, 1, state.player.crit);
+      state.enemy.hp -= result.damage;
+      animateSprite("enemySprite", "hit");
+      log(`你使出普通攻擊，造成 ${result.damage} 點傷害${result.critical ? "（爆擊！）" : ""}。`, result.critical ? "special" : "good");
+      gainMana(6);
+      afterPlayerAction();
+    }
+
+    function playerSkill() {
+      if (!canAct()) return;
+      const p = state.player;
+      const e = state.enemy;
+      const c = classData[p.classKey];
+      if (p.mp < c.skillCost) {
+        log("魔力不足，無法使用技能。", "bad");
+        return;
+      }
+
+      lockActions();
+      p.mp -= c.skillCost;
+      animateSprite("playerSprite", "attack");
+
+      if (p.classKey === "warrior") {
+        const result = calculateDamage(p.attack, e.defense, 1.9, p.crit + 0.05);
+        e.hp -= result.damage;
+        animateSprite("enemySprite", "hit");
+        log(`你施放「${c.skillName}」，造成 ${result.damage} 點傷害${result.critical ? "（爆擊！）" : ""}。`, "special");
+        if (e.hp > 0 && chance(0.35)) {
+          e.stunned = true;
+          log(`${e.name} 被震得暈眩了！`, "special");
+        }
+      } else if (p.classKey === "mage") {
+        const result = calculateDamage(p.attack + p.level * 2, e.defense, 2.1, p.crit);
+        e.hp -= result.damage;
+        e.burnTurns = 2;
+        e.burnDamage = Math.max(4, Math.round(p.attack * 0.35));
+        animateSprite("enemySprite", "hit");
+        log(`你施放「${c.skillName}」，造成 ${result.damage} 點傷害，敵人開始燃燒！`, "special");
+      } else {
+        let total = 0;
+        let crits = 0;
+        for (let i = 0; i < 2; i++) {
+          const result = calculateDamage(p.attack, e.defense, 0.82, p.crit + 0.08);
+          total += result.damage;
+          if (result.critical) crits++;
+        }
+        e.hp -= total;
+        animateSprite("enemySprite", "hit");
+        log(`你使出「${c.skillName}」，兩箭共造成 ${total} 點傷害${crits ? `，其中 ${crits} 次爆擊！` : ""}`, "special");
+      }
+
+      afterPlayerAction();
+    }
+
+    function playerDefend() {
+      if (!canAct()) return;
+      lockActions();
+      state.player.defending = true;
+      gainMana(10);
+      log("你架起防禦姿態，下一次受到的傷害減半，並恢復 10 點魔力。", "info");
+      afterPlayerAction();
+    }
+
+    function playerHeal() {
+      if (!canAct()) return;
+      if (state.potions <= 0 || state.player.hp >= state.player.maxHp) return;
+      lockActions();
+      state.potions--;
+      const amount = Math.max(1, Math.round(state.player.maxHp * 0.4));
+      const before = state.player.hp;
+      state.player.hp = Math.min(state.player.maxHp, state.player.hp + amount);
+      const healed = state.player.hp - before;
+      log(`你喝下生命藥水，恢復 ${healed} 點生命。`, "good");
+      afterPlayerAction();
+    }
+
+    function canAct() {
+      return state && !actionLocked && !state.battleOver && state.player.hp > 0;
+    }
+
+    function lockActions() {
+      actionLocked = true;
+      updateUI();
+    }
+
+    function gainMana(amount) {
+      state.player.mp = Math.min(state.player.maxMp, state.player.mp + amount);
+    }
+
+    function afterPlayerAction() {
+      updateUI();
+      if (state.enemy.hp <= 0) {
+        setTimeout(victory, 430);
+        return;
+      }
+      setTimeout(enemyTurn, 650);
+    }
+
+    function enemyTurn() {
+      const e = state.enemy;
+      const p = state.player;
+
+      if (e.burnTurns > 0) {
+        e.hp -= e.burnDamage;
+        e.burnTurns--;
+        log(`${e.name} 受到燃燒傷害 ${e.burnDamage} 點。`, "bad");
+        animateSprite("enemySprite", "hit");
+        updateUI();
+        if (e.hp <= 0) {
+          setTimeout(victory, 420);
+          return;
+        }
+      }
+
+      if (e.stunned) {
+        e.stunned = false;
+        log(`${e.name} 因為暈眩，無法行動！`, "special");
+        finishEnemyTurn();
+        return;
+      }
+
+      animateSprite("enemySprite", "attack");
+
+      let multiplier = 1;
+      let moveName = "普通攻擊";
+      let enemyCrit = 0.06;
+
+      if (e.boss && state.turnCount % 3 === 0) {
+        multiplier = 1.55;
+        moveName = state.floor === 10 ? "龍焰吐息" : "巨石猛擊";
+        enemyCrit = 0.02;
+      } else if (chance(0.16)) {
+        multiplier = 1.25;
+        moveName = "猛烈攻擊";
+      }
+
+      const result = calculateDamage(e.attack, p.defense, multiplier, enemyCrit);
+      let damage = result.damage;
+      if (p.defending) {
+        damage = Math.max(1, Math.floor(damage / 2));
+        p.defending = false;
+        log("你的防禦成功減少了傷害！", "info");
+      }
+
+      p.hp -= damage;
+      animateSprite("playerSprite", "hit");
+      log(`${e.name} 使用「${moveName}」，對你造成 ${damage} 點傷害${result.critical ? "（爆擊！）" : ""}。`, "bad");
+
+      if (p.hp <= 0) {
+        p.hp = 0;
+        updateUI();
+        setTimeout(gameOver, 430);
+        return;
+      }
+
+      finishEnemyTurn();
+    }
+
+    function finishEnemyTurn() {
+      state.turnCount++;
+      gainMana(4);
+      actionLocked = false;
+      updateUI();
+      saveGame(true);
+    }
+
+    function victory() {
+      state.enemy.hp = 0;
+      state.battleOver = true;
+      actionLocked = false;
+      const e = state.enemy;
+      state.gold += e.gold;
+      state.wins++;
+      state.player.xp += e.xp;
+      const mpRestore = Math.round(state.player.maxMp * 0.25);
+      state.player.mp = Math.min(state.player.maxMp, state.player.mp + mpRestore);
+
+      log(`你擊敗了 ${e.name}！獲得 ${e.xp} 經驗與 ${e.gold} 金幣。`, "good");
+      checkLevelUp();
+
+      if (chance(0.28)) {
+        state.potions++;
+        log("敵人掉落了一瓶生命藥水！", "special");
+      }
+
+      updateUI();
+      saveGame(true);
+
+      if (state.floor >= 10) {
+        showBetweenBattle("最終戰勝利！", "你已擊敗深淵魔龍，勇者之塔重新恢復和平！", true);
+      } else {
+        showBetweenBattle("戰鬥勝利！", `第 ${state.floor} 層已通過。準備好後前往下一層。`, false);
+      }
+    }
+
+    function checkLevelUp() {
+      const p = state.player;
+      while (p.xp >= p.xpToNext) {
+        p.xp -= p.xpToNext;
+        p.level++;
+        p.xpToNext = Math.round(p.xpToNext * 1.42);
+        p.maxHp += 14;
+        p.maxMp += 7;
+        p.attack += 4;
+        p.defense += 2;
+        p.hp = p.maxHp;
+        p.mp = p.maxMp;
+        log(`恭喜升到 Lv.${p.level}！生命、魔力與能力提升，並完全恢復。`, "special");
+      }
+    }
+
+    function showBetweenBattle(title, text, finalFloor) {
+      $("betweenTitle").textContent = title;
+      $("betweenText").textContent = text;
+      $("betweenPanel").classList.remove("hidden");
+      $("nextBattleBtn").textContent = finalFloor ? "查看結局" : "前往下一層";
+    }
+
+    function nextBattle() {
+      if (state.floor >= 10) {
+        showEnding(true);
+        return;
+      }
+
+      state.floor++;
+      state.enemy = makeEnemy(state.floor);
+      state.battleOver = false;
+      state.turnCount = 1;
+      state.restUsedThisFloor = false;
+      state.player.defending = false;
+      $("betweenPanel").classList.add("hidden");
+      battleLog.innerHTML = "";
+      log(`你來到第 ${state.floor} 層，${state.enemy.name} 出現了！`, "special");
+      actionLocked = false;
+      updateUI();
+      saveGame(true);
+    }
+
+    function rest() {
+      if (state.restUsedThisFloor) {
+        alert("這一層已經休息過一次了。");
+        return;
+      }
+      const p = state.player;
+      const hpGain = Math.round(p.maxHp * 0.35);
+      const mpGain = Math.round(p.maxMp * 0.5);
+      const oldHp = p.hp;
+      const oldMp = p.mp;
+      p.hp = Math.min(p.maxHp, p.hp + hpGain);
+      p.mp = Math.min(p.maxMp, p.mp + mpGain);
+      state.restUsedThisFloor = true;
+      log(`你休息了一會兒，恢復 ${p.hp - oldHp} HP 與 ${p.mp - oldMp} MP。`, "good");
+      updateUI();
+      saveGame(true);
+    }
+
+    function openShop() {
+      $("shopGoldText").textContent = state.gold;
+      $("shopModal").classList.remove("hidden");
+    }
+
+    function closeShop() {
+      $("shopModal").classList.add("hidden");
+      updateUI();
+      saveGame(true);
+    }
+
+    function buyItem(item) {
+      const costs = { potion: 20, attack: 45, defense: 45, maxHp: 55, maxMp: 50 };
+      const cost = costs[item];
+      if (state.gold < cost) {
+        alert("金幣不足！");
+        return;
+      }
+
+      state.gold -= cost;
+      const p = state.player;
+      if (item === "potion") {
+        state.potions++;
+        log("你購買了一瓶生命藥水。", "info");
+      } else if (item === "attack") {
+        p.attack += 4;
+        log("武器強化成功，攻擊力永久增加 4。", "info");
+      } else if (item === "defense") {
+        p.defense += 3;
+        log("護甲強化成功，防禦力永久增加 3。", "info");
+      } else if (item === "maxHp") {
+        p.maxHp += 18;
+        p.hp += 18;
+        log("生命水晶生效，最大生命永久增加 18。", "info");
+      } else if (item === "maxMp") {
+        p.maxMp += 10;
+        p.mp += 10;
+        log("魔力水晶生效，最大魔力永久增加 10。", "info");
+      }
+
+      $("shopGoldText").textContent = state.gold;
+      updateUI();
+      saveGame(true);
+    }
+
+    function gameOver() {
+      state.battleOver = true;
+      saveGame(true);
+      showEnding(false);
+    }
+
+    function showEnding(victoryState) {
+      $("endModal").classList.remove("hidden");
+      if (victoryState) {
+        $("endIcon").textContent = "🏆";
+        $("endTitle").textContent = "你成功登上塔頂！";
+        $("endText").textContent = `你以 Lv.${state.player.level} 的力量通過 10 層挑戰，共取得 ${state.wins} 場勝利，剩下 ${state.gold} 枚金幣。勇者之塔的傳說將永遠記住你！`;
+      } else {
+        $("endIcon").textContent = "💀";
+        $("endTitle").textContent = "冒險失敗";
+        $("endText").textContent = `你在第 ${state.floor} 層倒下了。下次可以多買藥水、適時防禦，或先強化裝備再挑戰。`;
+      }
+    }
+
+    // 顯示職業寫實插圖
+    document.querySelectorAll(".class-portrait").forEach((portrait) => {
+      portrait.style.backgroundImage = ART.heroes[portrait.dataset.art] || ART.heroes.warrior;
+    });
+
+    // 事件綁定
+    document.querySelectorAll(".class-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        document.querySelectorAll(".class-card").forEach((c) => c.classList.remove("selected"));
+        card.classList.add("selected");
+        selectedClass = card.dataset.class;
+      });
+    });
+
+    $("newGameBtn").addEventListener("click", startNewGame);
+    $("loadGameBtn").addEventListener("click", loadGame);
+    $("saveBtn").addEventListener("click", () => saveGame(false));
+    $("resetBtn").addEventListener("click", resetGame);
+    $("attackBtn").addEventListener("click", playerAttack);
+    $("skillBtn").addEventListener("click", playerSkill);
+    $("defendBtn").addEventListener("click", playerDefend);
+    $("healBtn").addEventListener("click", playerHeal);
+    $("nextBattleBtn").addEventListener("click", nextBattle);
+    $("shopBtn").addEventListener("click", openShop);
+    $("restBtn").addEventListener("click", rest);
+    $("closeShopBtn").addEventListener("click", closeShop);
+    $("endRestartBtn").addEventListener("click", () => {
+      localStorage.removeItem(SAVE_KEY);
+      location.reload();
+    });
+
+    document.querySelectorAll(".buy-btn").forEach((button) => {
+      button.addEventListener("click", () => buyItem(button.dataset.item));
+    });
+
+    // 點擊商店外側可關閉
+    $("shopModal").addEventListener("click", (event) => {
+      if (event.target === $("shopModal")) closeShop();
+    });
+
+    // 如果有存檔，讀取按鈕會亮起；沒有則保持可點並提示。
+    if (localStorage.getItem(SAVE_KEY)) {
+      $("loadGameBtn").textContent = "讀取上次存檔";
+    }
+  </script>
+</body>
+</html>
